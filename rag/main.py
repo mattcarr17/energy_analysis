@@ -97,20 +97,20 @@ def process_question(question):
     # Execute visualization
     visualization = execute_visualization(code)
 
-    return explanation, visualization
+    return explanation, code, visualization
 
 
 def respond(question):
     """Interface function between Gradio frontend and RAG backend."""
 
-    explanation, visual = process_question(question)
+    explanation, code, visual = process_question(question)
     # Test?
-    return explanation, visual
+    return explanation, code, visual
 
 gradio_interface = gr.Interface(
     fn = respond,
     inputs=[gr.Textbox(label='Enter question about U.S. Energy System')],
-    outputs = [gr.Textbox(), gr.Plot()],
+    outputs = [gr.Textbox(), gr.Textbox(), gr.Plot()],
     title='U.S. Energy Data Q&A System'
 )
 
