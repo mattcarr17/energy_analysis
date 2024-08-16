@@ -26,9 +26,50 @@ Data Dictionary:
 * USC2ERTA: CO2 Equivalent Emission Rate
 """
 
-def create_response(query):
+def create_response(query, prompt_choice):
 
-    prompt = f"""
+    prompts = {
+        "Prompt with Data": f"""You are an AI assistant specializing in data analysis and visualization around the energy system. You have access to 
+        a dataset with U.S. energy statistics in the following format:
+
+        {data.to_json()}
+
+        As an assistant, it is your job to support experts in their exploration and research on the energy system. We want this research
+        to be data-centric whenever possible. You will answer questions about the energy system and will reference the provided data whenever
+        relevant. 
+
+        For each query, you will do the following:
+        - Determine the question being asked can be answered using the data you have access to, if the data can support your answer, or, if the data is irrelevant for question
+        - If data can answer the question:
+            - Create a visualization using the Plotly library from Python to answer the question
+            - Explain the visual and how the data being presented clearly answers the users questions
+            - Provide an interpretation. Reference key statistics in your written answer
+        - If data can support your answer
+            - Provide a text response answering the question to the best of your knowledge
+            - Create a visualization using the Plotly library from and the data at your disposal to support claims in your written answer
+            - Reference the visualization in your written response, including any key statistics
+        - If data cannot answer or support your answer (ie. is irrelevant to your response)
+            - Answer the question to the best of your ability (this includes saying you do not know the answer)
+            - Since the data cannot support your answer, we do not need to create a visualization on the provided data itself,
+                using the Plotly library from Python, create a simple, fun/funny visual to display (eg. smiley face)
+
+        Very important step to be aware of: I do not want the visual opening in another window when executed. When writing the code, DO NOT include fig.show() at the end. 
+        Or at the very least, comment this line out so it will not execute. This is essential and must be followed for all visualizations.
+
+        Given the following question: "{query}"
+
+        1. Check the data to determine if it can be used to answer the question
+        2. Provide a detailed written explanation of the answer, including specific numbers, years, or trends from the data.
+        3. Decide if a visualization would be helpful to support your explanation/answer
+        4. If a visualization is needed, write Python code using Plotly Express to create it. The data is stored in a pandas dataframe, "data"
+        5. When writing code, use the exact column names as they appear in the data dictionary.
+        6. Format your response as follows:
+            ANSWER: [Detailed, data-driven answer here including specific statistics from the data]
+            VISUALIZATION:
+            ```python
+            [Python code here for visualization]
+            ```""",
+        "Prompt without Data": f"""
 
     You are an AI assistant specializing in data analysis and visualization around the energy system. You have access to 
     a dataset with U.S. energy statistics in the following format:
@@ -54,6 +95,9 @@ def create_response(query):
         - Since the data cannot support your answer, we do not need to create a visualization on the provided data itself,
             using the Plotly library from Python, create a simple, fun/funny visual to display (eg. smiley face)
 
+    Very important step to be aware of: I do not want the visual opening in another window when executed. When writing the code, DO NOT include fig.show() at the end. 
+    Or at the very least, comment this line out so it will not execute. This is essential and must be followed for all visualizations.
+
     Given the following question: "{query}"
 
     1. Check the data to determine if it can be used to answer the question
@@ -68,12 +112,14 @@ def create_response(query):
         [Python code here for visualization]
         ```
     """
+        }
+
 
     response = client.chat.completions.create(
         model = 'gpt-3.5-turbo',
         messages=[
             {"role": "system", "content": "You are a helpful assistant skilled in data analysis and research. You provide data-driven asnwers whenever possible. You respond in a professional manner, but keep it light and humerous when the opportunity presents itself"},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompts[prompt_choice]}
         ])
     
     return response.choices[0].message.content
@@ -86,9 +132,9 @@ def execute_visualization(code):
     return local_vars.get("fig")
 
 
-def process_question(question):
+def process_question(question, prompt_choice):
 
-    response = create_response(question)
+    response = create_response(question, prompt_choice)
 
     # Parse explanation and code
     explanation = response.split("ANSWER:")[1].split("VISUALIZATION:")[0].strip()
@@ -100,16 +146,17 @@ def process_question(question):
     return explanation, code, visualization
 
 
-def respond(question):
+def respond(question, prompt_choice):
     """Interface function between Gradio frontend and RAG backend."""
 
-    explanation, code, visual = process_question(question)
+    explanation, code, visual = process_question(question, prompt_choice)
     # Test?
     return explanation, code, visual
 
 gradio_interface = gr.Interface(
     fn = respond,
-    inputs=[gr.Textbox(label='Enter question about U.S. Energy System')],
+    inputs=[gr.Textbox(label='Enter question about U.S. Energy System'), 
+            gr.Radio(["Prompt with Data", "Prompt without Data"], label='Which prompt would you like to use?')],
     outputs = [gr.Textbox(), gr.Textbox(), gr.Plot()],
     title='U.S. Energy Data Q&A System'
 )
